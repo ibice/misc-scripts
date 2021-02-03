@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
 #
 # Inspired by a xkcd strip (https://xkcd.com/1930/)
 # Text and behaviour was specified by them. I just implemented it with py
