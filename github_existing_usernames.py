@@ -5,22 +5,30 @@ import requests
 import argparse
 import time
 import uuid
+import random
 import csv
 from sys import stdout
 from getpass import getpass
 
 
-ENDPOINT = 'https://api.github.com/users/'
-CHARS = "abcdefghijklmnopqrstuvwxyz"
-MOVE_TO_BOL = b'\r'
+ENDPOINT     = 'https://api.github.com/users/'
+CHARS        = 'abcdefghijklmnopqrstuvwxyz'
+VOCALS       = 'aeiouy'
+CONSONANTS   = 'bcdfghjklmnpqrstvwxz'
+TERMS        = 'dfklmnrstxz'
+INITS        = 'bcdfghjklmnprstvwxz'
+MOVE_TO_BOL  = b'\r'
 CLEAR_TO_EOL = b'\x1b[K'
+
 
 def clear_line():
     stdout.buffer.write(b'\x1b[%s' % MOVE_TO_BOL)
     stdout.buffer.write(b'\x1b[%s' % CLEAR_TO_EOL)
 
+
 def prompt_user_for_github_auth():
     return input('GitHub user: ')
+
 
 def prompt_pass_for_github_auth(user=None):
     if user:
@@ -28,8 +36,10 @@ def prompt_pass_for_github_auth(user=None):
     else:
         return getpass('GitHub pass: ')
 
+
 class GitHubAuthException(Exception):
     pass
+
 
 def status_char_generator():
     status_chars = list('-/|\\')
@@ -39,7 +49,7 @@ def status_char_generator():
         i += 1
 
 
-def username_generator(length=1):
+def username_generator(length=1, readable=False):
     def increment_user_string(user=None):
         if user == None:
             user = CHARS[0] * length
@@ -60,10 +70,37 @@ def username_generator(length=1):
             verbose_print('Incremented user: ' + user)
             return user
         
-    user = None
-    while user !=  CHARS[-1] * length:
-        user = increment_user_string(user)
-        yield user
+    if readable:
+        l = list()
+        for c1 in CONSONANTS:
+            for c2 in VOCALS:
+                for c3 in CONSONANTS:
+                    for c4 in VOCALS:
+                        l.append(c1 + c2 + c3 + c4)
+        for c1 in INITS:
+            for c2 in VOCALS:
+                for c3 in VOCALS:
+                    for c4 in TERMS:
+                        l.append(c1 + c2 + c3 + c4)
+        for c1 in VOCALS:
+            for c2 in TERMS:
+                for c3 in INITS:
+                    for c4 in VOCALS:
+                        l.append(c1 + c2 + c3 + c4)
+        for c1 in VOCALS:
+            for c2 in CONSONANTS:
+                for c3 in VOCALS:
+                    for c4 in TERMS:
+                        l.append(c1 + c2 + c3 + c4)
+        random.shuffle(l)
+        for u in l:
+            yield u
+    else:
+        user = None
+        while user !=  CHARS[-1] * length:
+            user = increment_user_string(user)
+            yield user
+
 
 def write_users_file(users, filename=None):
     if filename == None:
@@ -74,6 +111,7 @@ def write_users_file(users, filename=None):
         writer.writerows([["user", "exists"]])
         writer.writerows(users)
     print(f'Wrote queried users to {filename}')
+
 
 def query_user(user, auth):
     try: 
@@ -93,15 +131,17 @@ def query_user(user, auth):
             raise GitHubAuthException(f'Error authenticating user {auth[0]}')
         else:
             verbose_print(f'Unexpected status code {r.status_code}')
-            raise Exception('An unexpected status code was \
-                    returned when trying to fetch user ' + user)
+            print(r.text)
+            raise Exception('An unexpected status code was ' + 
+                            'returned when trying to fetch user ' + user)
     except Exception as e:
         raise e
     finally:
         clear_line()
 
+
 def main(length, github_user, github_pass, write_results, 
-        output_file=None, input_file=None, delay=0.2):
+        output_file=None, input_file=None, delay=0.2, readable=False):
 
     global verbose_print
     if not verbose_print:
@@ -115,7 +155,7 @@ def main(length, github_user, github_pass, write_results,
             username_provider = fd.read().splitlines()
             fd.close()
         else:
-            username_provider = username_generator(length=length)
+            username_provider = username_generator(length=length, readable=readable)
 
         status_char = status_char_generator()
 
@@ -145,6 +185,7 @@ def main(length, github_user, github_pass, write_results,
     finally:
         if write_results:
             write_users_file(users, filename=output_file)
+
 
 if __name__ == '__main__':
     
@@ -191,6 +232,11 @@ if __name__ == '__main__':
                         dest='github_pass',
                         help='GitHub password for authentication')
 
+    parser.add_argument('-x', '--readable',
+                        action='store_true',
+                        dest='readable',
+                        help='GitHub password for authentication')
+
     parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
     opt = parser.parse_args()
@@ -209,6 +255,7 @@ if __name__ == '__main__':
     verbose_print(f'Using a length of {opt.length} characters for usernames')
 
     main(opt.length, github_user, github_pass, opt.write_results,
-            output_file=opt.output_file,
-            input_file=opt.input_file,
-            delay=opt.delay)
+         output_file=opt.output_file,
+         input_file=opt.input_file,
+         delay=opt.delay,
+         readable=opt.readable)
